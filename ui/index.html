@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCC Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 40 24" aria-hidden="true">
+        <polyline points="2,4 11,20 20,4 29,20 38,4" />
+      </svg>
+      <div>
+        <div class="brand-name">HCC Workbench</div>
+        <div class="brand-sub">Vigenère, then Rail Fence</div>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Sections">
+      <button class="nav-item is-active" data-view="cipher">Encrypt and decrypt</button>
+      <button class="nav-item" data-view="attack">Attack lab</button>
+      <button class="nav-item" data-view="frequency">Frequency analysis</button>
+      <button class="nav-item" data-view="performance">Performance</button>
+      <button class="nav-item" data-view="notes">Design and security</button>
+    </nav>
+    <div class="side-foot">
+      <p class="course">CT-486 Network and Information Security<br>Complex Computing Problem, CLO3</p>
+      <p class="team-title">Group</p>
+      <ul class="team">
+        <li>Syeda Aiman Munawar <span>GA-23003</span></li>
+        <li>Naverah Farhat <span>GA-23004</span></li>
+        <li>Duaa Khalid <span>GA-23303</span></li>
+        <li>Zubia Junaid <span>GA-23307</span></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ============================== CIPHER ============================== -->
+    <section class="view is-active" id="view-cipher">
+      <header class="view-head">
+        <h1>Encrypt and decrypt</h1>
+        <p>Text passes through two stages. Stage 1 substitutes letters with a repeating keyword; stage 2 reorders them on a zig-zag fence. Decryption undoes the stages in reverse order.</p>
+      </header>
+
+      <div class="panel">
+        <div class="seg" role="tablist" aria-label="Mode">
+          <button class="seg-btn is-on" data-mode="encrypt" role="tab">Encrypt</button>
+          <button class="seg-btn" data-mode="decrypt" role="tab">Decrypt</button>
+        </div>
+
+        <form id="cipher-form" class="form" autocomplete="off">
+          <label class="field field-wide">
+            <span class="lbl" id="cipher-text-label">Plaintext</span>
+            <textarea id="cipher-text" rows="3" spellcheck="false"></textarea>
+            <span class="hint">Only the letters A–Z are kept. Spaces, digits and punctuation are removed so word boundaries do not leak to an attacker.</span>
+          </label>
+          <label class="field">
+            <span class="lbl">Vigenère keyword</span>
+            <input id="cipher-key" class="mono" spellcheck="false">
+            <span class="hint" id="key-hint">At least 10 letters, not a repeated shorter word.</span>
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Rails</span>
+            <input id="cipher-rails" type="number" min="2" step="1">
+            <span class="hint">2 or more</span>
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" id="cipher-run" type="submit">Encrypt</button>
+            <button class="btn" type="button" id="cipher-reset">Use demo values</button>
+          </div>
+        </form>
+        <p class="error" id="cipher-error" role="alert" hidden></p>
+      </div>
+
+      <section id="walk" class="walk" aria-label="How the ciphers work, step by step" hidden></section>
+
+      <div id="pipeline" class="pipeline" hidden></div>
+    </section>
+
+    <!-- ============================== ATTACK ============================== -->
+    <section class="view" id="view-attack">
+      <header class="view-head">
+        <h1>Attack lab</h1>
+        <p>The attacker knows the design but not the keys. The known-plaintext attack tries every rail count, reverses the fence and reads the keyword off by modular subtraction. A consistent repeating keyword means the guess is right.</p>
+      </header>
+
+      <div class="panel">
+        <div class="seg" role="tablist" aria-label="Attack type">
+          <button class="seg-btn is-on" data-attack="known" role="tab">Known plaintext</button>
+          <button class="seg-btn" data-attack="cipher-only" role="tab">Ciphertext only</button>
+        </div>
+
+        <form id="kpa-form" class="form" autocomplete="off">
+          <label class="field field-wide">
+            <span class="lbl">Intercepted ciphertext</span>
+            <textarea id="kpa-cipher" class="mono" rows="3" spellcheck="false"></textarea>
+          </label>
+          <label class="field field-half">
+            <span class="lbl">Known plaintext segment</span>
+            <input id="kpa-known" class="mono" spellcheck="false">
+            <span class="hint" id="kpa-known-hint">Needs more letters than the key length to be decisive.</span>
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Starts at letter</span>
+            <input id="kpa-offset" type="number" min="0" value="0">
+            <span class="hint">0 = first letter</span>
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Key length</span>
+            <input id="kpa-m" class="mono" value="12">
+            <span class="hint">e.g. 12 or 10-14</span>
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Rails from</span>
+            <input id="kpa-rmin" type="number" min="2" value="2">
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">to</span>
+            <input id="kpa-rmax" type="number" min="2" value="20">
+          </label>
+          <label class="check field-wide">
+            <input type="checkbox" id="kpa-lm" checked>
+            <span>If several guesses survive, prefer the one whose output looks most like English</span>
+          </label>
+          <details class="field-wide more">
+            <summary>Compare with the original message (optional)</summary>
+            <textarea id="kpa-original" rows="2" spellcheck="false" placeholder="Used only to confirm the result. The attack never sees it."></textarea>
+          </details>
+          <div class="actions">
+            <button class="btn btn-attack" type="submit">Run attack</button>
+            <button class="btn" type="button" id="kpa-demo">Load demo scenario</button>
+            <button class="btn" type="button" id="kpa-from-cipher">Use last ciphertext</button>
+          </div>
+        </form>
+
+        <form id="coa-form" class="form" autocomplete="off" hidden>
+          <label class="field field-wide">
+            <span class="lbl">Intercepted ciphertext</span>
+            <textarea id="coa-cipher" class="mono" rows="3" spellcheck="false"></textarea>
+            <span class="hint">No plaintext is known. Each rail count is undone, the text is split into key-length columns and every column is matched to English letter frequencies. Needs a few hundred letters.</span>
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Key length</span>
+            <input id="coa-m" type="number" min="1" value="12">
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Rails from</span>
+            <input id="coa-rmin" type="number" min="2" value="2">
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">to</span>
+            <input id="coa-rmax" type="number" min="2" value="20">
+          </label>
+          <details class="field-wide more">
+            <summary>Compare with the original message (optional)</summary>
+            <textarea id="coa-original" rows="2" spellcheck="false"></textarea>
+          </details>
+          <div class="actions">
+            <button class="btn btn-attack" type="submit">Run attack</button>
+            <button class="btn" type="button" id="coa-demo">Load 600-letter sample</button>
+          </div>
+        </form>
+        <p class="error" id="attack-error" role="alert" hidden></p>
+      </div>
+
+      <div id="attack-out" hidden></div>
+    </section>
+
+    <!-- ============================ FREQUENCY ============================= -->
+    <section class="view" id="view-frequency">
+      <header class="view-head">
+        <h1>Frequency analysis</h1>
+        <p>English uses some letters far more than others. A Shift cipher keeps that shape and only slides it; the Vigenère stage flattens it, and the Rail Fence stage hides the positions a column attack relies on.</p>
+      </header>
+
+      <div class="panel">
+        <form id="freq-form" class="form" autocomplete="off">
+          <label class="field field-wide">
+            <span class="lbl">Text to analyse</span>
+            <textarea id="freq-text" class="mono" rows="3" spellcheck="false"></textarea>
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Analyse</button>
+            <button class="btn" type="button" id="freq-last">Use last ciphertext</button>
+            <button class="btn" type="button" id="freq-english">Use English sample</button>
+          </div>
+        </form>
+        <p class="error" id="freq-error" role="alert" hidden></p>
+      </div>
+      <div id="freq-out" hidden></div>
+
+      <div class="panel">
+        <h2>Same message, three ways</h2>
+        <p class="lead">One English text, encrypted with a Shift cipher and with HCC, then run through the same frequency attack.</p>
+        <form id="cmp-form" class="form" autocomplete="off">
+          <label class="field field-narrow">
+            <span class="lbl">Message length</span>
+            <input id="cmp-n" type="number" min="50" max="20000" value="1000">
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Shift key</span>
+            <input id="cmp-shift" type="number" min="0" max="25" value="11">
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Compare</button>
+          </div>
+        </form>
+        <p class="error" id="cmp-error" role="alert" hidden></p>
+        <div id="cmp-out"></div>
+      </div>
+    </section>
+
+    <!-- =========================== PERFORMANCE ============================ -->
+    <section class="view" id="view-performance">
+      <header class="view-head">
+        <h1>Performance</h1>
+        <p>All figures are measured with <code>time.perf_counter</code> on this machine. The saved results come from the last full experiment run; the forms below rerun smaller versions live.</p>
+      </header>
+
+      <div class="panel">
+        <h2>Full experiment run</h2>
+        <p class="lead">Runs every experiment at full size and overwrites the files in <code>results/</code> (CSV tables and PNG graphs). It takes about a minute; the charts below reload from the new files when it finishes.</p>
+        <div class="actions">
+          <button class="btn btn-primary" type="button" id="full-run">Run full experiments and save</button>
+        </div>
+        <p class="caption" id="full-run-status"></p>
+        <p class="error" id="full-run-error" role="alert" hidden></p>
+      </div>
+
+      <div class="panel">
+        <h2>Encryption, decryption and attack time</h2>
+        <form id="tim-form" class="form form-inline" autocomplete="off">
+          <label class="field">
+            <span class="lbl">Message lengths</span>
+            <input id="tim-lengths" class="mono" value="50,100,500,1000,5000,10000">
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Trials each</span>
+            <input id="tim-trials" type="number" min="1" max="100" value="15">
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Measure now</button>
+          </div>
+        </form>
+        <p class="error" id="tim-error" role="alert" hidden></p>
+        <div id="tim-out"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Known-plaintext attack success</h2>
+        <p class="lead">Random 12-letter keywords and random rail counts between 2 and 20. The attacker is told the key length and the rail range, and knows the first <i>k</i> letters.</p>
+        <form id="suc-form" class="form form-inline" autocomplete="off">
+          <label class="field">
+            <span class="lbl">Ciphertext lengths</span>
+            <input id="suc-lengths" class="mono" value="100,500">
+          </label>
+          <label class="field">
+            <span class="lbl">Known letters k</span>
+            <input id="suc-sizes" class="mono" value="8,12,13,14,16,24">
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Trials</span>
+            <input id="suc-trials" type="number" min="1" max="200" value="40">
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Run experiment</button>
+          </div>
+        </form>
+        <p class="error" id="suc-error" role="alert" hidden></p>
+        <div id="suc-out"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Ciphertext-only attack success</h2>
+        <form id="coax-form" class="form form-inline" autocomplete="off">
+          <label class="field">
+            <span class="lbl">Ciphertext lengths</span>
+            <input id="coax-lengths" class="mono" value="100,250,500,1000">
+          </label>
+          <label class="field field-narrow">
+            <span class="lbl">Trials</span>
+            <input id="coax-trials" type="number" min="1" max="60" value="10">
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Run experiment</button>
+          </div>
+        </form>
+        <p class="error" id="coax-error" role="alert" hidden></p>
+        <div id="coax-out"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Time complexity</h2>
+        <table class="tbl">
+          <thead><tr><th>Operation</th><th>Time</th><th>Space</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Vigenère encrypt / decrypt</td><td class="mono">O(n)</td><td class="mono">O(n)</td><td>One modular addition per letter</td></tr>
+            <tr><td>Rail Fence encrypt / decrypt</td><td class="mono">O(n)</td><td class="mono">O(n)</td><td>The zig-zag order is built once and each letter is moved once</td></tr>
+            <tr><td>HCC encrypt / decrypt</td><td class="mono">O(n)</td><td class="mono">O(n)</td><td>Two linear passes, about twice the constant of one stage</td></tr>
+            <tr><td>Shift encrypt / decrypt</td><td class="mono">O(n)</td><td class="mono">O(n)</td><td>One pass, the single-stage baseline</td></tr>
+            <tr><td>Known-plaintext attack</td><td class="mono">O(R·(n + k·L))</td><td class="mono">O(n)</td><td>R rail guesses, each undoes the fence and checks k known letters for L key lengths</td></tr>
+            <tr><td>Ciphertext-only attack</td><td class="mono">O(R·(n + 26²·m))</td><td class="mono">O(n)</td><td>Each rail guess scores 26 shifts for each of the m columns</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================== NOTES =============================== -->
+    <section class="view" id="view-notes">
+      <header class="view-head">
+        <h1>Design and security</h1>
+        <p>How the two classical techniques are combined, why the combination is stronger than either one alone, and why it still breaks.</p>
+      </header>
+
+      <div class="panel prose">
+        <h2>How the stages fit together</h2>
+        <div class="flow" aria-label="Encryption flow">
+          <div class="flow-node">Plaintext</div>
+          <div class="flow-edge"></div>
+          <div class="flow-node s1">Stage 1<br><b>Vigenère</b><small>keyword, 10+ letters</small></div>
+          <div class="flow-edge"></div>
+          <div class="flow-node s2">Stage 2<br><b>Rail Fence</b><small>2+ rails</small></div>
+          <div class="flow-edge"></div>
+          <div class="flow-node">Ciphertext</div>
+        </div>
+        <p>Vigenère is a <b>substitution</b>: it changes what each letter is, using <span class="mono">C = (P + K[i mod m]) mod 26</span>. Rail Fence is a <b>transposition</b>: it changes where each letter sits by writing the text down and up across the rails and reading row by row. Combining a substitution with a transposition is the classical idea behind product ciphers: confusion from the first stage, diffusion of position from the second.</p>
+        <p>Decryption runs the inverse stages in reverse order: undo the fence first, then subtract the keyword. The secret key is the pair (keyword, rails).</p>
+
+        <h2>Security analysis</h2>
+        <ul>
+          <li><b>Single-letter frequency analysis fails.</b> The keyword uses m different shifts, so the ciphertext histogram is flattened and the index of coincidence drops from about 0.066 towards 0.038.</li>
+          <li><b>Kasiski and column attacks are disrupted.</b> They need letters that were enciphered with the same key letter to sit m positions apart. The fence moves them, so they only reappear after the right rail count is guessed.</li>
+          <li><b>The rail key is tiny.</b> There are only about n − 1 useful rail counts, so an attacker simply tries them all. The real key space is roughly 26<sup>m</sup> × n, but the two parts can be attacked one after the other.</li>
+          <li><b>Known plaintext breaks it in milliseconds.</b> With a little more than m known letters, every wrong rail guess produces a contradictory keyword and the right one stands out.</li>
+          <li><b>Long ciphertext breaks it without any plaintext.</b> With a few hundred letters of English, per-column chi-squared scoring over every rail count recovers both keys.</li>
+        </ul>
+        <p class="note">HCC is an educational cipher. It must never protect real data; modern systems use AES-GCM or ChaCha20-Poly1305.</p>
+
+        <h2>Cheap improvements</h2>
+        <ul>
+          <li>Replace Rail Fence with a keyed columnar transposition, so the permutation depends on a secret word rather than one small number.</li>
+          <li>Apply the Vigenère stage again after the transposition. Known plaintext then no longer lines up with a single key letter.</li>
+          <li>Use an autokey Vigenère, so the key stream is as long as the message and does not repeat with period m.</li>
+          <li>Choose long random keywords instead of dictionary words.</li>
+          <li>Each change keeps encryption and decryption O(n).</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+# The cipher, attacks, tests and CLI use ONLY the Python standard library (Python 3.8+).
+# matplotlib is optional: it is used only by performance.py to save PNG graphs.
+matplotlib>=3.5

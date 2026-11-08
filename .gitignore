@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.vscode/*
+!.vscode/launch.json
+.idea/
+.pytest_cache/
+
+# project report is submitted separately, not in the repository
+report/
