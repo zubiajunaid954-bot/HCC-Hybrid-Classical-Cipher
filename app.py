@@ -36,6 +36,7 @@ from utils import (MIN_KEYWORD_LENGTH, ValidationError, normalize_text, require_
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UI_DIR = os.path.join(BASE_DIR, "ui")
 MAX_TEXT = 200_000            # letters accepted by the API (keeps the demo responsive)
+WORKING_LIMIT = 120           # longest text shown step by step in the interface
 
 
 # --------------------------------------------------------------------- helpers
@@ -162,7 +163,25 @@ def api_attack_known(p):
                 cipher, known, result.selected.rails, result.selected.key_length, offset, rows=60)
         ]
     original = normalize_text(p.get("original", "") or "")
+
+    # Step-by-step working for the interface: every rail guess the attack tried (for one key
+    # length), with the fence undone and the key letters it produced. Short ciphertexts only,
+    # so every step stays readable on screen.
+    working = None
+    if len(cipher) <= WORKING_LIMIT:
+        m = result.selected.key_length if result.selected is not None else lengths[0]
+        guesses = []
+        for row in result.trace:
+            if row.key_length != m:
+                continue
+            g = attack.explain_guess(cipher, known, row.rails, m, offset)
+            guesses.append({"rails": g["rails"], "stage1": g["stage1"], "pattern": g["pattern"],
+                            "letters": g["letters"], "keyword": g["keyword"],
+                            "conflicts": g["conflicts"], "consistent": g["consistent"]})
+        working = {"keyLength": m, "offset": offset, "known": known, "ciphertext": cipher,
+                   "guesses": guesses}
     return {
+        "working": working,
         "status": result.status,
         "message": result.message,
         "selected": None if result.selected is None else {

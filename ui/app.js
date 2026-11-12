@@ -751,6 +751,158 @@ $("#kpa-demo").addEventListener("click", async () => {
   } catch (err) { showError($("#attack-error"), err.message); }
 });
 
+/* ------------------------------------------------------------------ step-by-step working of the attack
+   Replays the known-plaintext attack from the server's answer (r.working): for every rail guess,
+   undo the fence, subtract the known plaintext to get key letters and check that the keyword
+   repeats; then, for the chosen guess, read off the keyword, decrypt and verify.
+   Nothing is computed here: every letter comes from attack.explain_guess() on the server. */
+const atk = { r: null, steps: [], i: 0, box: null };
+
+function atkSteps(r) {
+  const steps = [];
+  r.working.guesses.forEach((g, gi) => { steps.push({ t: "undo", gi }); steps.push({ t: "derive", gi }); });
+  if (r.status === "recovered") steps.push({ t: "key" }, { t: "decrypt" }, { t: "verify" });
+  else steps.push({ t: r.status === "partial" ? "partial" : "failed" });
+  return steps;
+}
+
+function atkFence(g, n) {
+  const R = g.rails, cw = 24, pl = 64, pt = 18;
+  const rh = R <= 5 ? 34 : Math.max(15, Math.min(28, 190 / (R - 1)));
+  const rad = rh < 22 ? 8 : 10.5;
+  const W = pl + n * cw + 16, H = pt * 2 + (R - 1) * rh;
+  const x = i => pl + i * cw, y = row => pt + row * rh;
+  let s = `<svg class="fence rf atk-fence" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ciphertext written back on ${R} rails">`;
+  for (let row = 0; row < R; row++) {
+    s += `<line class="railline" x1="${pl - 12}" x2="${W - 6}" y1="${y(row)}" y2="${y(row)}"/>`;
+    if (R <= 12 || row % Math.ceil(R / 10) === 0 || row === R - 1) s += `<text class="rl" x="6" y="${y(row) + 4}">Rail ${row + 1}</text>`;
+  }
+  s += `<polyline class="path" points="${g.pattern.map((row, i) => `${x(i)},${y(row)}`).join(" ")}"/>`;
+  const known = new Set(atk.r.working.guesses[0] ? g.letters.map(l => l.index) : []);
+  g.pattern.forEach((row, i) => {
+    s += `<g class="on${known.has(i) ? " kn" : ""}" style="--d:${i * 12}ms"><circle class="dot" cx="${x(i)}" cy="${y(row)}" r="${rad}"/><text class="ch" x="${x(i)}" y="${y(row)}"${rad < 10 ? ' style="font-size:11px"' : ""}>${g.stage1[i]}</text></g>`;
+  });
+  return s + "</svg>";
+}
+
+function atkLetters(text, mark) {
+  return text.split("").map((ch, i) => `<span class="${[mark && mark.has(i) ? "kn" : "", i % 5 === 4 ? "gap" : ""].join(" ")}">${ch}</span>`).join("");
+}
+
+function buildAttackWalk(r) {
+  const box = $("#kpa-walk");
+  atk.r = r; atk.box = box;
+  if (!r.working) {
+    box.innerHTML = `<p class="note">The step-by-step working is shown for ciphertexts of up to 120 letters. This one has ${int(r.ciphertextLength)}; the full results are below.</p>`;
+    return;
+  }
+  if (!r.working.guesses.length) { box.innerHTML = ""; return; }
+  atk.steps = atkSteps(r); atk.i = 0;
+  box.innerHTML = `
+    <div class="walk-card atk">
+      <div class="stage-top"><div class="stage-name">How the attack worked<small>one rail guess at a time</small></div>
+        <div class="stage-meta"><span class="formula">K = (V′ − P) mod 26</span></div></div>
+      <p class="walk-say" aria-live="polite"></p>
+      <div class="walk-ctl">
+        <button type="button" class="btn btn-attack" data-anext>Perform next step</button>
+        <button type="button" class="btn" data-askip>Skip to the correct guess</button>
+        <button type="button" class="btn" data-aend>Show the result</button>
+        <span class="walk-count"></span>
+      </div>
+      <div class="atk-guesses"></div>
+      <div class="atk-body"></div>
+    </div>`;
+  $("[data-anext]", box).addEventListener("click", () => atkGo(atk.i + 1));
+  $("[data-aend]", box).addEventListener("click", () => atkGo(atk.steps.length - 1));
+  const sel = r.selected, skip = $("[data-askip]", box);
+  const gi = sel ? r.working.guesses.findIndex(g => g.rails === sel.rails) : -1;
+  if (gi < 0) skip.hidden = true;
+  else skip.addEventListener("click", () => atkGo(atk.steps.findIndex(s => s.t === "undo" && s.gi === gi)));
+  atkGo(0, true);
+}
+
+function atkGo(k, force) {
+  if (!atk.r) return;
+  k = Math.max(0, Math.min(atk.steps.length - 1, k));
+  if (k === atk.i && !force) return;
+  atk.i = k;
+  const r = atk.r, w = r.working, s = atk.steps[k], box = atk.box, m = w.keyLength;
+  const say = $(".walk-say", box), body = $(".atk-body", box);
+  const last = k === atk.steps.length - 1;
+  $(".walk-ctl", box).querySelectorAll("button").forEach(b => { b.disabled = last; });
+  $(".walk-count", box).textContent = `Step ${k + 1} of ${atk.steps.length}`;
+
+  // row of guesses tried so far: rejected in red, consistent in green
+  const doneUpTo = s.gi !== undefined ? s.gi - (s.t === "undo" ? 1 : 0) : w.guesses.length - 1;
+  $(".atk-guesses", box).innerHTML = w.guesses.map((g, i) => {
+    if (i > (s.gi !== undefined ? s.gi : w.guesses.length - 1)) return "";
+    const cur = s.gi === i, judged = i <= doneUpTo;
+    const cls = !judged ? "cur" : g.consistent ? "ok" : "bad";
+    return `<span class="gchip ${cls}${cur ? " now" : ""}">r = ${g.rails}${judged ? (g.consistent ? " ✓" : ` ✗ ${g.conflicts}`) : ""}</span>`;
+  }).join("");
+
+  const known = w.known, knownIdx = new Set(w.guesses[0].letters.map(l => l.index));
+  const tag = `<span class="tag atk">Attack</span>`;
+
+  if (s.t === "undo") {
+    const g = w.guesses[s.gi];
+    const counts = Array.from({ length: g.rails }, (_, row) => g.pattern.filter(p => p === row).length);
+    say.innerHTML = `${tag} Guess <b>r = ${g.rails}</b>: write the ciphertext back onto ${g.rails} rails, rail by rail (${counts.slice(0, 6).join(", ")}${counts.length > 6 ? ", …" : ""} letters), then read along the zig-zag. If the guess is right, this gives the Stage 1 text V′.`;
+    body.innerHTML = `
+      <div class="rf-src"><span class="rf-lbl">Intercepted ciphertext</span><div class="rf-letters">${atkLetters(w.ciphertext)}</div></div>
+      <div class="fence-wrap rf-wrap">${atkFence(g, w.ciphertext.length)}</div>
+      <div class="rf-src rf-out"><span class="rf-lbl">V′ (fence undone)</span><div class="rf-letters big">${atkLetters(g.stage1, knownIdx)}</div></div>
+      <p class="caption">Underlined letters sit where the known plaintext <span class="mono">${esc(known)}</span> is.</p>`;
+  } else if (s.t === "derive") {
+    const g = w.guesses[s.gi];
+    const cells = (f, cls) => g.letters.map(l => `<td class="${cls ? cls(l) : ""}">${f(l)}</td>`).join("");
+    const st = l => l.status === "new" ? "new" : l.status === "agrees" ? "ok" : "bad";
+    say.innerHTML = `${tag} For <b>r = ${g.rails}</b>, subtract each known plaintext letter from V′: K = (V′ − P) mod 26. Letters ${m} places apart use the same keyword letter, so they must agree. ` +
+      (g.consistent ? `<span class="yes">Every check agrees: the key repeats correctly, so this guess is consistent.</span>`
+        : `<span class="bad">${g.conflicts} check${g.conflicts > 1 ? "s" : ""} disagree, so r = ${g.rails} is rejected.</span>`);
+    body.innerHTML = `
+      <div class="strip atk-strip"><table>
+        <tr><th>Position</th>${cells(l => l.index + 1)}</tr>
+        <tr class="p"><th>Known P</th>${cells(l => l.plain)}</tr>
+        <tr><th>V′</th>${cells(l => l.stage1)}</tr>
+        <tr class="kk"><th>K = V′ − P</th>${cells(l => l.key, st)}</tr>
+        <tr class="sl"><th>Keyword letter</th>${cells(l => l.slot + 1, st)}</tr>
+      </table></div>
+      <div class="atk-key"><span class="rf-lbl">Keyword from this guess</span>
+        <div class="kbox-row">${g.keyword.split("").map(c => `<span class="kbox${c === "?" ? " unk" : ""}${g.consistent ? " good" : ""}">${c}</span>`).join("")}</div></div>
+      <p class="caption"><span class="lg new"></span> first letter for that keyword position <span class="lg ok"></span> agrees with it <span class="lg bad"></span> contradicts it</p>`;
+    body.querySelectorAll(".atk-strip td").forEach((td, i) => td.style.setProperty("--d", `${(i % g.letters.length) * 25}ms`));
+  } else if (s.t === "key") {
+    const sel = r.selected;
+    const others = w.guesses.filter(g => g.consistent).length - 1;
+    say.innerHTML = `${tag} ${others > 0 ? `${others + 1} guesses were consistent; the one whose decryption looks most like English was chosen` : `Only <b>r = ${sel.rails}</b> gave a consistent key`}. Its key letters, in keyword order, are the secret keyword.`;
+    body.innerHTML = `<div class="atk-key big"><span class="rf-lbl">Recovered keys</span>
+      <div class="kbox-row">${sel.keyword.split("").map((c, i) => `<span class="kbox good" style="--d:${i * 70}ms">${c}</span>`).join("")}</div>
+      <p class="atk-rails">Rails = <b>${sel.rails}</b> &nbsp; Keyword = <b class="mono">${esc(sel.keyword)}</b></p></div>`;
+  } else if (s.t === "decrypt") {
+    const sel = r.selected, g = w.guesses.find(x => x.rails === sel.rails), n = g.stage1.length;
+    say.innerHTML = `${tag} Now undo Stage 1 for the whole message: subtract the repeating keyword from V′, X = (Y − K) mod 26. The attacker never needed the keys to do this; they were recovered.`;
+    body.innerHTML = `<div class="strip atk-dec"><table>
+        <tr><th>V′</th>${g.stage1.split("").map(c => `<td>${c}</td>`).join("")}</tr>
+        <tr class="k"><th>Keyword</th>${Array.from({ length: n }, (_, i) => `<td${i && i % m === 0 ? ' class="cycle"' : ""}>${sel.keyword[i % m]}</td>`).join("")}</tr>
+        <tr class="o"><th>Plaintext</th>${r.plaintext.split("").map((c, i) => `<td class="new" style="--d:${i * 18}ms">${c}</td>`).join("")}</tr>
+      </table></div>`;
+  } else if (s.t === "verify") {
+    say.innerHTML = `${tag} Check: encrypting the recovered plaintext with the recovered keys ${r.verified ? '<span class="yes">gives exactly the intercepted ciphertext.</span>' : '<span class="bad">does not give the intercepted ciphertext.</span>'}` +
+      (r.matchesOriginal === true ? ' <span class="yes">It also matches the original message. Attack succeeded.</span>' : r.matchesOriginal === false ? ' <span class="bad">It differs from the original message.</span>' : "");
+    body.innerHTML = `<div class="rf-src"><span class="rf-lbl">Recovered plaintext</span><div class="rf-letters big">${atkLetters(r.plaintext)}</div></div>
+      <div class="rf-src"><span class="rf-lbl">Re-encrypted</span><div class="rf-letters">${atkLetters(w.ciphertext)}</div><span class="${r.verified ? "yes" : "bad"}">${r.verified ? "✓ same as intercepted" : "✗ different"}</span></div>`;
+  } else if (s.t === "partial") {
+    say.innerHTML = `${tag} <span class="bad">Not enough known plaintext.</span> The known letters cover only part of the ${m}-letter keyword, so several rail guesses look consistent and the keyword has gaps (?). Give more than ${m} known letters.`;
+    body.innerHTML = "";
+  } else {
+    say.innerHTML = `${tag} <span class="bad">No rail guess gave a consistent key.</span> The assumptions are wrong: check the key length, the rail range, the position of the known text, or whether it really belongs to this ciphertext.`;
+    body.innerHTML = "";
+  }
+  const wrap = $(".rf-wrap", body);
+  if (wrap) wrap.scrollLeft = 0;
+}
+
 function renderKpa(r) {
   const tag = { recovered: ["ok", "Keys recovered"], partial: ["part", "Not enough known plaintext"], failed: ["fail", "Attack failed"] }[r.status];
   let html = `<div class="status ${tag[0]}"><div><div class="status-tag">${tag[1]}</div><p>${esc(r.message)}</p></div></div>`;
@@ -763,6 +915,7 @@ function renderKpa(r) {
     <div class="fact"><dt>Letter operations</dt><dd>${int(r.charOperations)}</dd></div>
     <div class="fact"><dt>Time</dt><dd>${ms(r.elapsedMs)} ms</dd></div>
   </dl>`;
+  html += `<div id="kpa-walk"></div>`;
   if (r.plaintext) {
     const checks = [`Re-encrypting with the recovered keys ${r.verified ? '<span class="yes">reproduces the ciphertext exactly</span>' : '<span class="bad">does not reproduce the ciphertext</span>'}.`];
     if (r.matchesOriginal !== null) checks.push(r.matchesOriginal ? '<span class="yes">Matches the original message.</span>' : '<span class="bad">Differs from the original message.</span>');
@@ -795,6 +948,7 @@ function renderKpa(r) {
     }</tbody></table></div>`;
   }
   const out = $("#attack-out"); out.innerHTML = html; out.hidden = false;
+  buildAttackWalk(r);
   out.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 }
 

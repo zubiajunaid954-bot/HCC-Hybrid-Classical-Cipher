@@ -363,6 +363,43 @@ input[aria-invalid="true"] { border-color: var(--atk); box-shadow: 0 0 0 3px var
 @keyframes hcc-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hcc-draw { from { stroke-dashoffset: 3000; } to { stroke-dashoffset: 0; } }
 
+/* step-by-step working of the attack */
+.walk-card.atk { border-left-color: var(--atk); margin-bottom: 14px; }
+.walk-card.atk .stage-name { color: var(--atk); }
+.tag.atk { background: var(--atk-soft); color: var(--atk); }
+.atk-guesses { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.atk-guesses:empty { display: none; }
+.gchip { font: 600 12.5px var(--mono); padding: 3px 9px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink-2); }
+.gchip.ok { background: var(--s2-soft); border-color: #a9dccf; color: var(--s2); }
+.gchip.bad { background: var(--atk-soft); border-color: #f0b9b3; color: var(--atk); }
+.gchip.cur { background: var(--surface); border-color: var(--ink-3); color: var(--ink); }
+.gchip.now { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink-3); }
+.atk-fence g.kn .dot { stroke-width: 2.4; }
+.rf-letters span.kn { text-decoration: underline; text-decoration-color: var(--atk); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.atk-strip td.new { background: var(--s1-soft); color: var(--s1); font-weight: 600; }
+.atk-strip td.ok { background: var(--s2-soft); color: var(--s2); font-weight: 600; }
+.atk-strip td.bad { background: var(--atk-soft); color: var(--atk); font-weight: 700; }
+.atk-strip tr.sl td { font: 11px var(--sans); }
+.atk-key { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.atk-key.big { flex-direction: column; align-items: flex-start; }
+.kbox-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.kbox { width: 28px; height: 32px; display: grid; place-items: center; font: 700 16px var(--mono); border: 1px solid var(--line); border-radius: 4px; background: var(--sunk); color: var(--ink); }
+.kbox.unk { color: var(--ink-3); }
+.kbox.good { background: var(--s2-soft); border-color: #a9dccf; color: var(--s2); }
+.atk-key.big .kbox { width: 38px; height: 44px; font-size: 22px; }
+.atk-rails { margin: 4px 0 0; font-size: 15px; color: var(--ink-2); }
+.lg { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin: 0 4px 0 10px; }
+.lg.new { background: var(--s1-soft); border: 1px solid #bfd0f3; }
+.lg.ok { background: var(--s2-soft); border: 1px solid #a9dccf; }
+.lg.bad { background: var(--atk-soft); border: 1px solid #f0b9b3; }
+.btn-attack[disabled], .walk-card.atk .btn[disabled] { opacity: 0.45; cursor: default; }
+@media (prefers-reduced-motion: no-preference) {
+  .atk-fence g.on { animation: hcc-fade 0.35s ease-out both; animation-delay: var(--d, 0ms); }
+  .atk-strip tr.kk td, .atk-strip tr.sl td { animation: hcc-drop 0.3s ease-out both; animation-delay: var(--d, 0ms); }
+  .atk-key.big .kbox { animation: hcc-drop 0.35s ease-out both; animation-delay: var(--d, 0ms); }
+  .atk-dec td.new { animation: hcc-drop 0.3s ease-out both; animation-delay: var(--d, 0ms); }
+}
+
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 14px; z-index: 10; }
 .loading { color: var(--ink-3); font-size: 14px; padding: 8px 0; }
 

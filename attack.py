@@ -143,6 +143,44 @@ def derivation_table(ciphertext, known_plaintext, rails, key_length, known_offse
     return table
 
 
+def explain_guess(ciphertext, known_plaintext, rails, key_length, known_offset=0):
+    """Every intermediate value of the attack for ONE (rails, key length) guess.
+
+    Used by the step-by-step view in the interface. The arithmetic is the same as in
+    known_plaintext_attack: undo the fence, then K = (V' - P) mod 26 for each known letter,
+    and a letter that lands on an already-filled keyword position must agree with it.
+    Each known letter is reported with status "new" (first letter for that keyword
+    position), "agrees" or "conflict".
+    """
+    ciphertext = require_message(ciphertext, "ciphertext")
+    known_plaintext = require_message(known_plaintext, "known plaintext")
+    stage1 = undo_rail_fence_raw(ciphertext, rails)
+    slots = [None] * key_length
+    letters, conflicts = [], 0
+    for t, plain in enumerate(known_plaintext):
+        index = known_offset + t
+        slot = index % key_length
+        key = num_to_char(char_to_num(stage1[index]) - char_to_num(plain))
+        if slots[slot] is None:
+            slots[slot], status = key, "new"
+        elif slots[slot] == key:
+            status = "agrees"
+        else:
+            status, conflicts = "conflict", conflicts + 1
+        letters.append({"index": index, "plain": plain, "stage1": stage1[index],
+                        "slot": slot, "key": key, "status": status})
+    return {
+        "rails": rails,
+        "key_length": key_length,
+        "stage1": stage1,
+        "pattern": rail_fence.rail_pattern(len(ciphertext), rails),
+        "letters": letters,
+        "keyword": "".join(UNKNOWN if s is None else s for s in slots),
+        "conflicts": conflicts,
+        "consistent": conflicts == 0,
+    }
+
+
 def known_plaintext_attack(ciphertext, known_plaintext, key_lengths, rail_range=(2, 20),
                            known_offset=0, use_language_model=True):
     """Recover the HCC keys from a known plaintext segment.

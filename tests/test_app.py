@@ -38,6 +38,27 @@ class TestWebApi(unittest.TestCase):
         self.assertTrue(r["verified"])
         self.assertTrue(r["matchesOriginal"])
 
+    def test_attack_working_matches_the_search_log(self):
+        plain = "MEETMEATTHELIBRARYTOMORROW"
+        cipher = hybrid_cipher.encrypt(plain, "SECURITYKEYS", 4)
+        r = app.api_attack_known({"ciphertext": cipher, "known": plain[:16], "keyLengths": "12",
+                                  "railMin": 2, "railMax": 8, "original": plain})
+        guesses = r["working"]["guesses"]
+        self.assertEqual([g["rails"] for g in guesses], [t["rails"] for t in r["trace"]])
+        for g, t in zip(guesses, r["trace"]):
+            self.assertEqual(g["keyword"], t["key"])
+            self.assertEqual(g["conflicts"], t["conflicts"])
+            self.assertEqual(sum(l["status"] == "conflict" for l in g["letters"]), t["conflicts"])
+        right = next(g for g in guesses if g["rails"] == 4)
+        self.assertTrue(right["consistent"])
+        self.assertEqual(right["stage1"], "EIGNDMTRDLCDAFTUIGMMWSPJGA")   # the true Stage 1 text
+
+    def test_attack_working_only_for_short_ciphertexts(self):
+        plain = "THEQUICKBROWNFOXJUMPSOVERTHELAZYDOG" * 5
+        cipher = hybrid_cipher.encrypt(plain, "SECURITYKEYS", 5)
+        r = app.api_attack_known({"ciphertext": cipher, "known": plain[:20], "keyLengths": "12"})
+        self.assertIsNone(r["working"])
+
     def test_key_length_range_parsing(self):
         self.assertEqual(app._int_list("10-12,15", "Key length"), [10, 11, 12, 15])
         with self.assertRaises(ValidationError):
